@@ -1,12 +1,22 @@
+import os
 import sys
+
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+
 import math as m
 import serial.tools.list_ports
 import pandas as pd
+import time
+from datetime import datetime
+
 from pyGeoCOM.surveytools import Angle, Coordinate
 from pyGeoCOM.GeoComLite import TotalStation, AtmosphericCorrectionData 
 from pyGeoCOM.GeoComEnumeration import PositionMode, ATRMode, EDMMeasurementMode, TMCInclinationSensorMeasurementProgram, OnOffType
-import time
-from datetime import datetime
 
 
 
