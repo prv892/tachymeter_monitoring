@@ -9,7 +9,6 @@ sys.modules['busio'] = MagicMock()
 fake_bmp_module = MagicMock()
 
 # 3. Define what the simulated sensor should return when read
-# Adjust these attributes to match whatever properties your sensor.py reads (e.g., .pressure, .temperature)
 fake_bmp_module.BMP3XX_I2C.return_value.pressure = 1013.25
 fake_bmp_module.BMP3XX_I2C.return_value.temperature = 22.5
 

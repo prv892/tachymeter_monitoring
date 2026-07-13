@@ -2,9 +2,9 @@ import sys
 import math as m
 import serial.tools.list_ports
 import pandas as pd
-from surveytools import Angle, Coordinate
-from GeoComLite import TotalStation, AtmosphericCorrectionData 
-from GeoComEnumeration import PositionMode, ATRMode, EDMMeasurementMode, TMCInclinationSensorMeasurementProgram, OnOffType
+from pyGeoCOM.surveytools import Angle, Coordinate
+from pyGeoCOM.GeoComLite import TotalStation, AtmosphericCorrectionData 
+from pyGeoCOM.GeoComEnumeration import PositionMode, ATRMode, EDMMeasurementMode, TMCInclinationSensorMeasurementProgram, OnOffType
 import time
 from datetime import datetime
 import Satzmessung
