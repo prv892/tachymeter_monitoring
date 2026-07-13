@@ -33,6 +33,9 @@ Zusätzlich bietet das Projekt GUIs zur Konfiguration der Messparameter und zur 
   Ermöglicht die nachträgliche Auswertung bereits aufgezeichneter Rohdaten, um die Ausgleichung ohne aktive Hardware-Verbindung zu testen.
 * `config.py`  
   Grafischer Konfigurator zur einfachen Bearbeitung der JSON-basierten `params.txt` (Punkte, Soll-Koordinaten, Standardabweichungen).
+* `dashboard.py`  
+  Zeigt auf Grundlage der in /ergebnisse/ abgelegten Neupunkte-CSVs die Veränderungen der Punkte in einer GUI an;
+  Darstellung ist recht experimental, soll aber einen Startpunkt für konkrete Anwendungen bieten
 * `visur-rechner.py`  
   Eigenständiges GUI-Tool für geodätische Polarberechnungen (Horizontalrichtungen, Zenitwinkel und 3D-Distanzen zwischen Koordinaten). Nützlich für die Einrichtung des Systems
 
