@@ -103,7 +103,6 @@ class MonitoringDashboard:
         except tk.TclError:
             self.root.attributes('-zoomed', True)
 
-        # Event für sauberes Schließen binden (verhindert Lags)
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         self.data_manager = DataManager()
@@ -126,17 +125,16 @@ class MonitoringDashboard:
         self.refresh_data()
 
     def on_closing(self):
-        """Wird aufgerufen, wenn das Fenster geschlossen wird. Räumt Matplotlib-Speicher auf."""
-        plt.close('all') # Alle Graphen aus dem Speicher löschen
-        self.root.quit() # Mainloop stoppen
-        self.root.destroy() # Fenster sauber zerstören
+        plt.close('all') 
+        self.root.quit() 
+        self.root.destroy() 
 
     def _setup_ui(self):
         toolbar = ttk.Frame(self.root, padding="10 10 10 5")
         toolbar.pack(side="top", fill="x")
         
         # Gruppe 1: Punktauswahl
-        frame_auswahl = ttk.LabelFrame(toolbar, text=" 🎯 Punktauswahl ", padding=5)
+        frame_auswahl = ttk.LabelFrame(toolbar, text="  Punktauswahl ", padding=5)
         frame_auswahl.pack(side="left", padx=(0, 15), fill="y")
         
         self.cb_points = ttk.Combobox(frame_auswahl, state="readonly", width=15)
@@ -144,7 +142,7 @@ class MonitoringDashboard:
         self.cb_points.bind("<<ComboboxSelected>>", self.on_point_select)
         
         # Gruppe 2: Darstellungsoptionen (2D/3D)
-        frame_opt = ttk.LabelFrame(toolbar, text=" 👁️ Darstellungsoptionen (2D & 3D) ", padding=5)
+        frame_opt = ttk.LabelFrame(toolbar, text="  Darstellungsoptionen (2D & 3D) ", padding=5)
         frame_opt.pack(side="left", padx=(0, 15), fill="y")
         
         self.cb_color = ttk.Checkbutton(frame_opt, text="Zeit-Farbverlauf", 
@@ -158,10 +156,10 @@ class MonitoringDashboard:
         self.cb_quiver.pack(side="left", padx=10, pady=2)
         
         # Gruppe 3: Aktionen
-        frame_act = ttk.LabelFrame(toolbar, text=" ⚙️ Aktionen ", padding=5)
+        frame_act = ttk.LabelFrame(toolbar, text="  Aktionen ", padding=5)
         frame_act.pack(side="right", fill="y")
         
-        ttk.Button(frame_act, text="🔄 Daten neu laden", command=self.refresh_data).pack(side="left", padx=5, pady=2)
+        ttk.Button(frame_act, text=" Daten neu laden", command=self.refresh_data).pack(side="left", padx=5, pady=2)
         
         # --- Tabs ---
         self.notebook = ttk.Notebook(self.root)
@@ -333,7 +331,7 @@ class MonitoringDashboard:
         toolbar_time.pack(side="top", fill="x")
 
         # ==========================================
-        # TAB 2: 2D BEWEGUNG MIT HOVER & QUIVER
+        # TAB 2: 2D BEWEGUNG
         # ==========================================
         self.fig_2d, ax_2d = plt.subplots(figsize=(8, 6))
         self.fig_2d.suptitle(f"2D Bewegungsverlauf (X/Y) für Punkt: {pnr}", fontsize=14)
@@ -412,7 +410,7 @@ class MonitoringDashboard:
         toolbar_2d.pack(side="top", fill="x")
 
         # ==========================================
-        # TAB 3: 3D BEWEGUNG MIT ROTATION & QUIVER
+        # TAB 3: 3D BEWEGUNG 
         # ==========================================
         self.fig_3d, ax_3d = plt.subplots(figsize=(8, 6), subplot_kw={'projection': '3d'})
         self.fig_3d.suptitle(f"3D Bewegungsverlauf (X/Y/Z) für Punkt: {pnr}", fontsize=14)

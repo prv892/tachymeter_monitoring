@@ -57,7 +57,6 @@ def load_params_from_file(path: str):
         # 3. Parameter (Key-Value)
         file_params = data.get("params", {})
         for k in model["params"].keys():
-            # Wert aus "params"-Objekt oder Root-Ebene (Legacy) beziehen
             if k in file_params:
                 model["params"][k] = file_params[k]
             elif k in data:
@@ -149,7 +148,6 @@ class ParamDialog(simpledialog.Dialog):
         self.result = (key, val)
         return True
 
-# ----------------------------- Haupt-App -----------------------------
 class ParamsApp:
     def __init__(self, root):
         self.root = root
@@ -159,6 +157,11 @@ class ParamsApp:
         self.data = empty_model()
         self._build_layout()
         self._populate_all()
+
+        try:
+            self.root.state('zoomed')
+        except tk.TclError:
+            self.root.attributes('-zoomed', True)
 
     def _build_layout(self):
         main = ttk.Frame(self.root, padding=12)
@@ -295,7 +298,6 @@ class ParamsApp:
 
 def main():
     root = tk.Tk()
-    #root.state("zoomed")
     app = ParamsApp(root)
     root.mainloop()
 
