@@ -230,7 +230,6 @@ def main():
         schreibe_ergebnis_pdf(os.path.join(ORDNER_RES, f"{zeit}.pdf"), gma, neupunkte)
         
     except Exception as e:
-        # Falls es doch kracht, zeigt uns das 'import traceback' genau wo
         import traceback
         print(f"Fehler bei Ausgleichung/Export: {e}")
         traceback.print_exc()

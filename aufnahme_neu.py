@@ -35,7 +35,7 @@ class execute():
         self.druck = druck
         
         self.connect() #Port beachten! (siehe connect())
-        self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
+        #self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
         
         ###--- 
 
@@ -97,7 +97,7 @@ class execute():
                     m_obj.target_number, 
                     float(m_obj.direction.value_rad),
                     float(m_obj.zenith.value_rad), 
-                    korr_dist*0.5
+                    korr_dist
                     #achtung *0.5 evtl wieder weg!
                 )
                 L2.addMessung(x)
@@ -109,7 +109,7 @@ class execute():
         self.sm = Satzmessung.Satzmessung(self.alle_saetze) 
         
         self.moveit(0,200) #Parkposition
-        self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
+        #self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
         self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
 
     def connect(self):
@@ -119,8 +119,8 @@ class execute():
         Entweder das Tachymeter IMMER als 1. anschließen, oder den Port entsprechend ändern
         Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
         """
-        #self.totalstation = TotalStation("/dev/ttyUSB0", baudrate=9600)
-        self.totalstation = TotalStation("COM1", baudrate=9600)
+        #self.totalstation = TotalStation("/dev/ttyUSB0", baudrate=9600) #für linux
+        self.totalstation = TotalStation("COM11", baudrate=9600)     #für windows
 
     def moveit(self, ph, pv):
         self.totalstation.set_telescope_position(Angle.from_gon(ph%400), Angle.from_gon(pv%400), 
