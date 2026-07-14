@@ -4,6 +4,8 @@ Dieses Repository enthält ein, in Python geschriebenes Softwaresystem für das 
 
 Zusätzlich bietet das Projekt GUIs zur Konfiguration der Messparameter und zur Berechnung von Polarwerten aus Koordinaten, um die Installation des Systems zu erleichtern
 
+Link zum wiki: https://wiki.fbg-hsbo.de/index.php/Totalstationmonitoring_mit_TCRA_1103_Plus
+
 ---
 
 ## Kernfunktionen
