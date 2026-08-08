@@ -17,12 +17,11 @@ class sortierer():
     """
     @staticmethod
     def output(dictlist, auf):
-        # Wir nutzen die eingebaute sort-Funktion von Python, das ist schneller und sauberer
-        # Wir sortieren nach dem Key "HZ" (Großbuchstaben beachten wegen der Vorverarbeitung in main)
+    
         try:
             dictlist.sort(key=lambda x: x["HZ"], reverse=not auf)
         except KeyError:
-            # Fallback, falls die Keys doch kleingeschrieben sind
+            
             dictlist.sort(key=lambda x: x["hz"], reverse=not auf)
         return dictlist
 
@@ -35,7 +34,7 @@ class execute():
         self.druck = druck
         
         self.connect() #Port beachten! (siehe connect())
-        #self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
+        self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
         
         ###--- 
 
@@ -109,7 +108,7 @@ class execute():
         self.sm = Satzmessung.Satzmessung(self.alle_saetze) 
         
         self.moveit(0,200) #Parkposition
-        #self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
+        self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
         self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
 
     def connect(self):
@@ -119,8 +118,8 @@ class execute():
         Entweder das Tachymeter IMMER als 1. anschließen, oder den Port entsprechend ändern
         Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
         """
-        #self.totalstation = TotalStation("/dev/ttyUSB0", baudrate=9600) #für linux
-        self.totalstation = TotalStation("COM11", baudrate=9600)     #für windows
+        self.totalstation = TotalStation("/dev/ttyUSB0", baudrate=9600) #für linux
+        #self.totalstation = TotalStation("COM11", baudrate=9600)     #für windows
 
     def moveit(self, ph, pv):
         self.totalstation.set_telescope_position(Angle.from_gon(ph%400), Angle.from_gon(pv%400), 
