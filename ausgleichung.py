@@ -69,7 +69,7 @@ class GaussMarkovAusgleichung:
 
     def iterative_loesung(self):
         max_iter = 50
-        konvergenz_limit = 1e-12
+        konvergenz_limit = 1e-8
         self.x = self.berechne_naeherungswerte()
         
         for i in range(max_iter):

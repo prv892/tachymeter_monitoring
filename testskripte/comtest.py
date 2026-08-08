@@ -42,7 +42,7 @@ class execute():
         Entweder das Tachymeter IMMER als 1. anschließen, oder den Port entsprechend ändern
         Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
         """
-        self.totalstation = TotalStation("COM5", baudrate=19200)
+        self.totalstation = TotalStation("/dev/ttyUSB1", baudrate=115200)
 
     def moveit(self, ph, pv):
         self.totalstation.set_telescope_position(Angle.from_gon(ph%400), Angle.from_gon(pv%400), 

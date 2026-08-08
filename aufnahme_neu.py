@@ -118,7 +118,7 @@ class execute():
         Entweder das Tachymeter IMMER als 1. anschließen, oder den Port entsprechend ändern
         Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
         """
-        self.totalstation = TotalStation("/dev/ttyUSB0", baudrate=9600) #für linux
+        self.totalstation = TotalStation("/dev/ttyUSB1", baudrate=115200) #für linux
         #self.totalstation = TotalStation("COM11", baudrate=9600)     #für windows
 
     def moveit(self, ph, pv):
