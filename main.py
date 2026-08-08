@@ -1,28 +1,5 @@
 import sys
-from unittest.mock import MagicMock
-
-# 1. Create the fake modules
-sys.modules['board'] = MagicMock()
-sys.modules['busio'] = MagicMock()
-
-# 2. Create a specialized mock for the BMP sensor
-fake_bmp_module = MagicMock()
-
-# 3. Define what the simulated sensor should return when read
-fake_bmp_module.BMP3XX_I2C.return_value.pressure = 1013.25
-fake_bmp_module.BMP3XX_I2C.return_value.temperature = 22.5
-
-# 4. Inject our smart mock into Python's system memory
-sys.modules['adafruit_bmp3xx'] = fake_bmp_module
-
-# Your original code starts here...
-from sensor import Thermometer, PressureManager, ThermometerException
-
-# Your original code starts here...
-from sensor import Thermometer, PressureManager, ThermometerException
-
-
-
+import subprocess
 import os, math, json, csv, numpy as np
 from datetime import datetime
 from aufnahme_neu import execute
@@ -101,6 +78,28 @@ def schreibe_neupunkte_csv(path, neupunkte):
     except Exception as e:
         print(f"Fehler beim CSV-Export: {e}")
 
+def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
+    """Speichert die reinen Neupunkte im Amberg Geodate Format."""
+    if not neupunkte:
+        return
+    
+    # Nur Neupunkte ausgeben, keine APS (Festpunkte)
+    echte_neupunkte = [p for p in neupunkte if str(p["PNR"]) not in ap_pnrs]
+    if not echte_neupunkte:
+        return
+        
+    dt_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write("DateTime;SensorName;CustomerName;Flags;SensorType;Unit;East;North;Height;km;VALUE1;VALUE2;VALUE3;CULTURE:US\n")
+            for p in echte_neupunkte:
+                # Format: DateTime;PNR;;;Prism;m;;;;;X;Y;Z;;;
+                f.write(f"{dt_str};{p['PNR']};;;Prism;m;;;;;{p['x']:.3f};{p['y']:.3f};{p['z']:.3f};;;\n")
+        print(f"Amberg Geodate Export erfolgreich: {path}")
+    except Exception as e:
+        print(f"Fehler beim Amberg Geodate Export: {e}")
+
 def schreibe_ergebnis_pdf(path, gma, neupunkte):
     doc = SimpleDocTemplate(path, pagesize=A4)
     styles = getSampleStyleSheet()
@@ -140,10 +139,8 @@ def main():
         if not os.path.exists(o): os.makedirs(o)
 
     # --- Parameter-Struktur normalisieren ---
-    # Alles auf Großbuchstaben für den sicheren Zugriff
     params = {k.upper(): v for k, v in params_raw.items()}
     
-    # Extrahiere das Unter-Objekt "PARAMS" aus der JSON
     config = params.get("PARAMS", {})
     config = {k.upper(): v for k, v in config.items()}
 
@@ -171,7 +168,6 @@ def main():
         t_manager.Close()
 
     # Aufnahme starten
-    # Wichtig: params["PKTLISTE"] kommt von der Hauptebene, anz_saetze aus config
     aufnahme = execute(params["PKTLISTE"], anz_saetze, temp=aktuelle_temp, druck=aktueller_druck)
     
     # Berechnungen vorbereiten
@@ -201,7 +197,6 @@ def main():
                 if not mw_pnr: continue
 
                 for ziel in params_raw.get("PKTLISTE", []):
-                    # Fall A: Ziel ist ein Dictionary
                     if isinstance(ziel, dict):
                         z_pnr = str(ziel.get("pnr") or ziel.get("PNR") or "")
                         if z_pnr == mw_pnr and mw.get("HZ_red") is not None:
@@ -209,8 +204,6 @@ def main():
                             v_k = "vz" if "vz" in ziel else "VZ"
                             ziel[h_k] = round(mw["HZ_red"]*200/math.pi, 4)
                             ziel[v_k] = round(mw["VZ_red"]*200/math.pi, 4)
-                    
-                    # Fall B: Ziel ist eine Liste [PNR, HZ, VZ, ...]
                     elif isinstance(ziel, list) and len(ziel) >= 3:
                         if str(ziel[0]) == mw_pnr and mw.get("HZ_red") is not None:
                             ziel[1] = round(mw["HZ_red"]*200/math.pi, 4)
@@ -225,6 +218,18 @@ def main():
             # CSV Export
             csv_path = os.path.join(ORDNER_RES, f"{zeit}_neupunkte.csv")
             schreibe_neupunkte_csv(csv_path, neupunkte)
+
+            # --- AMBERG GEODATE EXPORT & UPLOAD ---
+            ap_pnrs = {str(p.get("PNR") or p.get("pnr")) for p in params.get("SOLL_KOORDINATEN", [])}
+            amberg_path = os.path.join(ORDNER_RES, f"{zeit}_amberg.csv")
+            schreibe_amberg_csv(amberg_path, neupunkte, ap_pnrs)
+
+            # Upload-Skript aufrufen (Läuft als nicht blockierender Subprozess)
+            try:
+                subprocess.Popen([sys.executable, "upload.py", amberg_path])
+                print(f"Upload-Skript (upload.py) für {amberg_path} aufgerufen.")
+            except Exception as e:
+                print(f"Fehler beim Aufruf von upload.py: {e}")
 
         # PDF Bericht schreiben
         schreibe_ergebnis_pdf(os.path.join(ORDNER_RES, f"{zeit}.pdf"), gma, neupunkte)

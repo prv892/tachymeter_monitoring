@@ -1,0 +1,6 @@
+{
+    "FTP_HOST": "ftp.dein-server.de",
+    "FTP_USER": "dein_benutzername",
+    "FTP_PASS": "dein_passwort",
+    "FTP_DIR": "/ziel/verzeichnis/auf/dem/server/"
+}

@@ -1,5 +1,7 @@
 import os
 import sys
+import subprocess
+from datetime import datetime
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -35,6 +37,28 @@ def schreibe_neupunkte_csv(path, neupunkte):
         print(f"CSV-Export erfolgreich: {path}")
     except Exception as e:
         print(f"Fehler beim CSV-Export: {e}")
+
+def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
+    """Speichert die reinen Neupunkte im Amberg Geodate Format."""
+    if not neupunkte:
+        return
+    
+    echte_neupunkte = [p for p in neupunkte if str(p["PNR"]) not in ap_pnrs]
+    if not echte_neupunkte:
+        return
+        
+    dt_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write("DateTime;SensorName;CustomerName;Flags;SensorType;Unit;East;North;Height;km;VALUE1;VALUE2;VALUE3;CULTURE:US\n")
+            for p in echte_neupunkte:
+                # Format: DateTime;PNR;;;Prism;m;;;;;X;Y;Z;;;
+                f.write(f"{dt_str};{p['PNR']};;;Prism;m;;;;;{p['x']:.3f};{p['y']:.3f};{p['z']:.3f};;;\n")
+        print(f"Amberg Geodate Export erfolgreich: {path}")
+    except Exception as e:
+        print(f"Fehler beim Amberg Geodate Export: {e}")
+
 
 def lade_rohdaten_aus_datei(dateiname):
     """
@@ -122,7 +146,6 @@ def run_simulation(dateiname):
 
     # 4. Ausgleichung
     try:
-        # Übergabe der Soll-Koordinaten von der Hauptebene der JSON
         gma = GaussMarkovAusgleichung(sm.koor_lokal, params.get("SOLL_KOORDINATEN", []))
         gma.berechne_und_eliminiere_ausreisser()
         
@@ -136,20 +159,28 @@ def run_simulation(dateiname):
             if not os.path.exists(ergebnis_ordner):
                 os.makedirs(ergebnis_ordner)
 
-            # CSV-Pfad generieren (z.B. simulation_neupunkte.csv)
+            # CSV-Pfad generieren
             csv_name = dateiname.replace("rohdaten", "neupunkte").replace(".txt", ".csv")
             csv_path = os.path.join(ergebnis_ordner, f"sim_{csv_name}")
-
-            # CSV schreiben
             schreibe_neupunkte_csv(csv_path, neupunkte)
+            
+            # --- AMBERG GEODATE EXPORT & UPLOAD ---
+            ap_pnrs = {str(p.get("PNR") or p.get("pnr")) for p in params.get("SOLL_KOORDINATEN", [])}
+            amberg_csv_name = dateiname.replace("rohdaten", "amberg").replace(".txt", ".csv")
+            amberg_path = os.path.join(ergebnis_ordner, f"sim_{amberg_csv_name}")
+            schreibe_amberg_csv(amberg_path, neupunkte, ap_pnrs)
+            
+            try:
+                subprocess.Popen([sys.executable, "upload.py", amberg_path])
+                print(f"Upload-Skript (upload.py) für {amberg_path} aufgerufen.")
+            except Exception as e:
+                print(f"Fehler beim Aufruf von upload.py: {e}")
             
             # Konsolen-Output zur Kontrolle
             for npkt in neupunkte:
                 print(f"  PNR {npkt['PNR']:<10}: X={npkt['x']:10.4f}, Y={npkt['y']:10.4f}, Z={npkt['z']:10.4f}")
         else:
             print("Ausgleichung fehlgeschlagen.")
-
-        
             
     except Exception as e:
         import traceback
