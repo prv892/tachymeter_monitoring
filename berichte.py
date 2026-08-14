@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 
 def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
-    """Speichert die reinen Neupunkte im Amberg Geodate Format. (Struktur unverändert)"""
+    """Speichert die reinen Neupunkte im Amberg Geodata Format."""
     if not neupunkte:
         return
     
@@ -24,7 +24,7 @@ def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
                 f.write(f"{dt_str};{pnr};;;Prism;m;;;;;{p['x']:.3f};{p['y']:.3f};{p['z']:.3f};;;\n")
         print(f"Amberg Geodate Export erfolgreich: {path}")
     except Exception as e:
-        print(f"Fehler beim Amberg Geodate Export: {e}")
+        print(f"Fehler beim Amberg Geodata Export: {e}")
 
 
 def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
