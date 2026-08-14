@@ -4,7 +4,7 @@ import serial.tools.list_ports
 import pandas as pd
 from pyGeoCOM.surveytools import Angle, Coordinate
 from pyGeoCOM.GeoComLite import TotalStation, AtmosphericCorrectionData 
-from pyGeoCOM.GeoComEnumeration import PositionMode, ATRMode, EDMMeasurementMode, TMCInclinationSensorMeasurementProgram, OnOffType
+from pyGeoCOM.GeoComEnumeration import PositionMode, ATRMode, EDMMeasurementMode, TMCInclinationSensorMeasurementProgram, OnOffType, BAPPrismenType 
 import time
 from datetime import datetime
 import Satzmessung
@@ -17,7 +17,6 @@ class sortierer():
     """
     @staticmethod
     def output(dictlist, auf):
-    
         try:
             dictlist.sort(key=lambda x: x["HZ"], reverse=not auf)
         except KeyError:
@@ -35,19 +34,21 @@ class execute():
         
         self.connect() #Port beachten! (siehe connect())
         self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
+        time.sleep(40)
         
         ###--- 
 
         """
         Die 1. Geschwindigkeitskorretion wird im Gerät nach Herstellerformel angebracht! 
         """
-
+        self.set_prism_type(BAPPrismenType.BAP_PRISM_ROUND)
         atmo_data = AtmosphericCorrectionData(0.2818, self.druck, self.temp, self.temp)
         print(f"Sende Atmo-Daten: {self.temp}°C bei {self.druck}hPa")
         self.totalstation.set_atm_correction(atmo_data)
         
         ###---
 
+        print("Setze Streckenmessmodus...")
         self.changeEDMmode(0) ### Streckenmessmodus mit Reflektor, Reflektorlos = 1
         self.alle_saetze = [] 
 
@@ -64,6 +65,7 @@ class execute():
                 hz = float(punkt.get("HZ", punkt.get("hz")))
                 vz = float(punkt.get("VZ", punkt.get("vz")))
                 p_const = float(punkt.get("PRISM", punkt.get("prism", 0.0)))
+                print("Messung 1. Lage: Punkt "+str(pnr))
                 self.moveit(hz, vz)
                 
                 m_obj = self.totalstation.measure(pnr, self.totalstation.get_atm_correction(), time.time())
@@ -85,7 +87,7 @@ class execute():
                 vz = float(punkt.get("VZ", punkt.get("vz")))
                 p_const = float(punkt.get("PRISM", punkt.get("prism", 0.0)))
             
-                
+                print("Messung 2. Lage: Punkt "+str(pnr))
                 # Berechnung für die zweite Lage (Umschlag)
                 self.moveit(hz + 200, 400 - vz)
                 
@@ -107,7 +109,9 @@ class execute():
             
         self.sm = Satzmessung.Satzmessung(self.alle_saetze) 
         
+        print("Satzmessung beendet, Warteposition...")
         self.moveit(0,200) #Parkposition
+        print("Gute Nacht Tachymeter!")
         self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
         self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
 
@@ -128,3 +132,13 @@ class execute():
     def changeEDMmode(self, index):
         mode = EDMMeasurementMode.EDM_SINGLE_STANDARD if index == 0 else EDMMeasurementMode.EDM_SINGLE_SRANGE
         self.totalstation.set_edm_mode(mode)
+
+    def set_prism_type(self, prism_type: BAPPrismenType):
+        """
+        Sendet den Befehl zum Wechsel des Prismentyps direkt über die 
+        offene Schnittstelle der pyGeoCOM-Bibliothek.
+        RPC 17008 = BAP_SetPrismType
+        """
+        command = f"%R1Q,17008:{prism_type.value}"
+        response = self.totalstation.request(command)
+        return response[0] # Gibt den LeicaReturnCode zurück    

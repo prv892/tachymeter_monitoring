@@ -23,7 +23,7 @@ class Thermometer:
     Entweder das Thermometer IMMER als 2. anschließen, oder den Port entsprechend ändern
     Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
     """
-    def __init__(self, port='/dev/ttyUSB1', timeout=1):
+    def __init__(self, port='/dev/ttyUSB0', timeout=1):
         self.port = port
         self.timeout = timeout
         self.uart = None

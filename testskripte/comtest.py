@@ -28,12 +28,13 @@ class execute():
         self.druck = druck
         
         self.connect() #Port beachten! (siehe connect())
-        #self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
-        
+        self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
+        time.sleep(30)
+        self.totalstation.get_instrument_name();
         
         self.moveit(100,100) #Parkposition
         self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
-        #self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
+        self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
 
     def connect(self):
 

@@ -115,7 +115,7 @@ class PointDialog(simpledialog.Dialog):
             ttk.Label(master, text=lbl).grid(row=i, column=0, sticky="w", **pad)
             
             if key == "prism":
-                ent = ttk.Combobox(master, values=["0.0", "-0.0175"], width=21)
+                ent = ttk.Combobox(master, values=["0.0", "0.0175"], width=21)
                 ent.grid(row=i, column=1, **pad)
                 val = self.init.get(key, "0.0")
                 ent.insert(0, str(val))
