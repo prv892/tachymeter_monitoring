@@ -69,7 +69,8 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
                     val = gma.x[i] if i < 3 else gma.x[i] * 200 / math.pi
                     
                     std = 0.0
-                    if hasattr(gma, 'std_dev') and gma.std_dev and len(gma.std_dev) > i:
+                    # FIX: 'is not None' hinzugefügt, um NumPy Ambiguitäts-Fehler zu vermeiden
+                    if hasattr(gma, 'std_dev') and gma.std_dev is not None and len(gma.std_dev) > i:
                         std = gma.std_dev[i] if i < 3 else gma.std_dev[i] * 200 / math.pi
                         
                     unit = "[m]  " if i < 3 else "[gon]"
@@ -91,7 +92,6 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
             for npkt in neupunkte:
                 pnr_str = str(npkt.get("PNR", npkt.get("pnr", "")))
                 
-               
                 if pnr_str in final_ap_pnrs and pnr_str in soll_dict:
                     soll = soll_dict[pnr_str]
                     dx = soll.get("x", 0.0) - npkt["x"]
@@ -109,7 +109,6 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
             f.write("--- Transformierte Neupunkte (Globales System) ---\n")
             f.write(f"  {'PNR':<10} | {'X':<14} | {'Y':<14} | {'Z':<14}\n")
             f.write("  " + "-"*56 + "\n")
-            
             
             echte_neupunkte = [p for p in neupunkte if str(p.get("PNR", p.get("pnr", ""))) not in soll_dict]
             
