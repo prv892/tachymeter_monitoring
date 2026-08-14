@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.linalg import block_diag
-import random
 
 class GaussMarkovAusgleichung:
     def __init__(self, koor_lokal: list, koor_global_soll: list):
@@ -32,6 +31,10 @@ class GaussMarkovAusgleichung:
         self.x = np.zeros(6) # dX, dY, dZ, omega, phi, kappa
         self.s0 = 0.0
         self.std_dev = np.zeros(6)
+        
+        
+        self.protokoll_iterationen = 0
+        self.eliminierungs_protokoll = []
 
     def berechne_naeherungswerte(self):
         """Stabilere Näherungswerte durch Schwerpunktzentrierung"""
@@ -122,7 +125,11 @@ class GaussMarkovAusgleichung:
 
     def berechne_und_eliminiere_ausreisser(self):
         """Stochastische Eliminierung basierend auf dem 2-Sigma Kriterium"""
+        self.protokoll_iterationen = 0
+        self.eliminierungs_protokoll = []
+        
         while len(self.punkte) >= 4:
+            self.protokoll_iterationen += 1
             success = self.iterative_loesung()
             if not success: break
             
@@ -130,6 +137,9 @@ class GaussMarkovAusgleichung:
             R = self.calculate_R(om, ph, ka)
             idx_to_remove = -1
             max_violation = 0
+            
+            
+            elim_residuen = None
             
             for i, p in enumerate(self.punkte):
                 p_ist = np.array([dX, dY, dZ]) + R @ p['l']
@@ -142,10 +152,20 @@ class GaussMarkovAusgleichung:
                     if violation_factor > 1.0 and violation_factor > max_violation:
                         max_violation = violation_factor
                         idx_to_remove = i
+                        elim_residuen = v_vektor.copy()
 
             if idx_to_remove != -1: 
                 pnr = self.punkte[idx_to_remove]['PNR']
                 print(f"--> ELIMINIERT: {pnr} (2-Sigma Verletzung Faktor {max_violation:.2f})")
+                
+                
+                self.eliminierungs_protokoll.append({
+                    "iteration": self.protokoll_iterationen,
+                    "pnr": pnr,
+                    "violation": max_violation,
+                    "residuen": elim_residuen
+                })
+                
                 self.punkte.pop(idx_to_remove)
                 self.konvergiert = False
                 continue 
@@ -163,8 +183,6 @@ class GaussMarkovAusgleichung:
         for p_l in alle_koor_lokal:
             pnr = str(p_l.get('pnr') or p_l.get('PNR'))
             
-            # Die Filterung 'if pnr not in passpunkt_pnrs:' wurde entfernt,
-            # damit JEDER Punkt transformiert wird.
             l_vec = np.array([float(p_l['x']), float(p_l['y']), float(p_l['z'])])
             g = np.array([dX, dY, dZ]) + R @ l_vec
             
