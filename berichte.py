@@ -1,5 +1,6 @@
 import os
 import math
+import numpy as np
 from datetime import datetime
 
 def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
@@ -43,8 +44,11 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
             f.write(f"Ausgleichungs-Durchläufe: {getattr(gma, 'protokoll_iterationen', 'Unbekannt')}\n")
             
             s0 = getattr(gma, 's0', 0.0)
-            f.write(f"Sigma 0                 : {s0:.6f} m\n")
-            f.write(f"Sigma 0 Quadrat         : {s0**2:.12f} m²\n\n")
+            f.write(f"Sigma 0 (s0)            : {s0:.6f} m\n")
+            f.write(f"Sigma 0 Quadrat (s0²)   : {s0**2:.12f} m²\n")
+            if s0 > 0:
+                f.write(f"1 / s0²                 : {1/(s0**2):.12f}\n")
+            f.write("\n")
 
             # 2. Iterationen & Eliminierte Punkte / Ausreißer
             f.write("--- Protokoll der Ausreißer-Eliminierung ---\n")
@@ -69,7 +73,6 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
                     val = gma.x[i] if i < 3 else gma.x[i] * 200 / math.pi
                     
                     std = 0.0
-                    # FIX: 'is not None' hinzugefügt, um NumPy Ambiguitäts-Fehler zu vermeiden
                     if hasattr(gma, 'std_dev') and gma.std_dev is not None and len(gma.std_dev) > i:
                         std = gma.std_dev[i] if i < 3 else gma.std_dev[i] * 200 / math.pi
                         
@@ -80,24 +83,29 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
             f.write("\n")
 
             # 4. Residuen der final verbliebenen Passpunkte
-            f.write("--- Residuen der Passpunkte (Soll - Ist) ---\n")
+            f.write("--- Residuen der finalen Passpunkte (Soll - Ist) ---\n")
             f.write(f"  {'PNR':<10} | {'dX [m]':<10} | {'dY [m]':<10} | {'dZ [m]':<10} | {'3D-Abw [m]':<10}\n")
             f.write("  " + "-"*65 + "\n")
             
-            final_ap_pnrs = [str(p['PNR']) for p in getattr(gma, 'punkte', [])]
-            soll_coords = params.get("SOLL_KOORDINATEN", [])
-            soll_dict = {str(p.get("PNR", p.get("pnr"))): p for p in soll_coords}
-            
             hat_residuen = False
-            for npkt in neupunkte:
-                pnr_str = str(npkt.get("PNR", npkt.get("pnr", "")))
+            final_ap_pnrs = []
+            
+            if hasattr(gma, 'punkte') and getattr(gma, 'konvergiert', False):
+                dX_t, dY_t, dZ_t, om, ph, ka = gma.x
+                R = gma.calculate_R(om, ph, ka)
                 
-                if pnr_str in final_ap_pnrs and pnr_str in soll_dict:
-                    soll = soll_dict[pnr_str]
-                    dx = soll.get("x", 0.0) - npkt["x"]
-                    dy = soll.get("y", 0.0) - npkt["y"]
-                    dz = soll.get("z", 0.0) - npkt["z"]
+                # Wir gehen alle Punkte durch, die die GMM-Klasse intern als FINALE Passpunkte hält
+                for p in gma.punkte:
+                    pnr_str = str(p['PNR'])
+                    final_ap_pnrs.append(pnr_str)
+                    
+                    # Residuen (Soll - Ist) exakt berechnen wie bei der Konsolenausgabe
+                    g_ber = np.array([dX_t, dY_t, dZ_t]) + R @ p['l']
+                    v = p['g'] - g_ber
+                    
+                    dx, dy, dz = v[0], v[1], v[2]
                     d3 = math.sqrt(dx**2 + dy**2 + dz**2)
+                    
                     f.write(f"  {pnr_str:<10} | {dx:10.4f} | {dy:10.4f} | {dz:10.4f} | {d3:10.4f}\n")
                     hat_residuen = True
                     
@@ -110,7 +118,9 @@ def schreibe_ausgleichung_txt(path, gma, neupunkte, params):
             f.write(f"  {'PNR':<10} | {'X':<14} | {'Y':<14} | {'Z':<14}\n")
             f.write("  " + "-"*56 + "\n")
             
-            echte_neupunkte = [p for p in neupunkte if str(p.get("PNR", p.get("pnr", ""))) not in soll_dict]
+            # Alle echten Neupunkte filtern, die KEINE Passpunkte waren 
+            # (bzw. Passpunkte, die eliminiert wurden, gelten ab sofort auch wieder als "Neupunkt"!)
+            echte_neupunkte = [p for p in neupunkte if str(p.get("PNR", p.get("pnr", ""))) not in final_ap_pnrs]
             
             if echte_neupunkte:
                 for npkt in echte_neupunkte:
