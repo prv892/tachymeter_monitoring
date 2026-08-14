@@ -5,10 +5,7 @@ from datetime import datetime
 from aufnahme_neu import execute
 from ausgleichung import GaussMarkovAusgleichung
 from Satzmessung import Satzmessung
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
+import berichte
 
 """
 Dieses Modul ist das "Main"-Modul des ganzen Programms.
@@ -78,58 +75,9 @@ def schreibe_neupunkte_csv(path, neupunkte):
     except Exception as e:
         print(f"Fehler beim CSV-Export: {e}")
 
-def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
-    """Speichert die reinen Neupunkte im Amberg Geodate Format."""
-    if not neupunkte:
-        return
-    
-    # Nur Neupunkte ausgeben, keine APS (Festpunkte)
-    echte_neupunkte = [p for p in neupunkte if str(p["PNR"]) not in ap_pnrs]
-    if not echte_neupunkte:
-        return
-        
-    dt_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-    
-    try:
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write("DateTime;SensorName;CustomerName;Flags;SensorType;Unit;East;North;Height;km;VALUE1;VALUE2;VALUE3;CULTURE:US\n")
-            for p in echte_neupunkte:
-                # Format: DateTime;PNR;;;Prism;m;;;;;X;Y;Z;;;
-                f.write(f"{dt_str};{p['PNR']};;;Prism;m;;;;;{p['x']:.3f};{p['y']:.3f};{p['z']:.3f};;;\n")
-        print(f"Amberg Geodate Export erfolgreich: {path}")
-    except Exception as e:
-        print(f"Fehler beim Amberg Geodate Export: {e}")
 
-def schreibe_ergebnis_pdf(path, gma, neupunkte):
-    doc = SimpleDocTemplate(path, pagesize=A4)
-    styles = getSampleStyleSheet()
-    story = [Paragraph("Transformationsergebnisse", styles["Title"]), Spacer(1, 12)]
-    status_text = "Status: Konvergenz erreicht." if gma.konvergiert else "ACHTUNG: Konvergenz GESCHEITERT!"
-    color = colors.green if gma.konvergiert else colors.red
-    story.append(Paragraph(f"<font color={color}>{status_text}</font>", styles["Normal"]))
-    
-    story.append(Paragraph("Parameter", styles["Heading2"]))
-    p_data = [["Parameter", "Wert", "Std-Dev"]]
-    labels = ['dX', 'dY', 'dZ', 'omega', 'phi', 'kappa']
-    for i, label in enumerate(labels):
-        val = gma.x[i] if i < 3 else gma.x[i] * 200/math.pi
-        std = gma.std_dev[i] if i < 3 else gma.std_dev[i] * 200/math.pi
-        unit = "[m]" if i < 3 else "[gon]"
-        p_data.append([label, f"{val:.4f} {unit}", f"±{std:.6f}"])
-    
-    t1 = Table(p_data, hAlign='LEFT')
-    t1.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('BACKGROUND',(0,0),(-1,0), colors.lightgrey)]))
-    story.append(t1)
 
-    if gma.konvergiert and neupunkte:
-        story.append(Spacer(1, 20))
-        story.append(Paragraph("Transformierte Neupunkte", styles["Heading2"]))
-        n_data = [["PNR", "X", "Y", "Z"]] + [[p["PNR"], f"{p['x']:.4f}", f"{p['y']:.4f}", f"{p['z']:.4f}"] for p in neupunkte]
-        t2 = Table(n_data, hAlign='LEFT')
-        t2.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('BACKGROUND',(0,0),(-1,0), colors.lightblue)]))
-        story.append(t2)
-    
-    doc.build(story)
+
 
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -222,22 +170,25 @@ def main():
             # --- AMBERG GEODATE EXPORT & UPLOAD ---
             ap_pnrs = {str(p.get("PNR") or p.get("pnr")) for p in params.get("SOLL_KOORDINATEN", [])}
             amberg_path = os.path.join(ORDNER_RES, f"{zeit}_amberg.csv")
-            schreibe_amberg_csv(amberg_path, neupunkte, ap_pnrs)
+            
+            # NEU: Aufruf über das neue Modul
+            berichte.schreibe_amberg_csv(amberg_path, neupunkte, ap_pnrs)
 
-            # Upload-Skript aufrufen (Läuft als nicht blockierender Subprozess)
+            # Upload-Skript aufrufen ...
             try:
                 subprocess.Popen([sys.executable, "upload.py", amberg_path])
                 print(f"Upload-Skript (upload.py) für {amberg_path} aufgerufen.")
             except Exception as e:
                 print(f"Fehler beim Aufruf von upload.py: {e}")
 
-        # PDF Bericht schreiben
-        schreibe_ergebnis_pdf(os.path.join(ORDNER_RES, f"{zeit}.pdf"), gma, neupunkte)
+        # NEU: Text Bericht schreiben (ersetzt PDF)
+        # Übergebe params_raw, damit die Residuen anhand der SOLL_KOORDINATEN berechnet werden können
+        txt_path = os.path.join(ORDNER_RES, f"{zeit}_ausgleichung.txt")
+        berichte.schreibe_ausgleichung_txt(txt_path, gma, neupunkte, params_raw)
         
     except Exception as e:
         import traceback
         print(f"Fehler bei Ausgleichung/Export: {e}")
         traceback.print_exc()
-
 if __name__ == "__main__": 
     main()

@@ -14,6 +14,8 @@ import csv
 
 from Satzmessung import Messung, Lage, Satz, Satzmessung
 from ausgleichung import GaussMarkovAusgleichung
+# NEU: Das ausgelagerte Berichte-Modul importieren
+import berichte
 
 # Globalen Basispfad definieren
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -38,27 +40,8 @@ def schreibe_neupunkte_csv(path, neupunkte):
     except Exception as e:
         print(f"Fehler beim CSV-Export: {e}")
 
-def schreibe_amberg_csv(path, neupunkte, ap_pnrs):
-    """Speichert die reinen Neupunkte im Amberg Geodate Format."""
-    if not neupunkte:
-        return
-    
-    echte_neupunkte = [p for p in neupunkte if str(p["PNR"]) not in ap_pnrs]
-    if not echte_neupunkte:
-        return
-        
-    dt_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-    
-    try:
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write("DateTime;SensorName;CustomerName;Flags;SensorType;Unit;East;North;Height;km;VALUE1;VALUE2;VALUE3;CULTURE:US\n")
-            for p in echte_neupunkte:
-                # Format: DateTime;PNR;;;Prism;m;;;;;X;Y;Z;;;
-                f.write(f"{dt_str};{p['PNR']};;;Prism;m;;;;;{p['x']:.3f};{p['y']:.3f};{p['z']:.3f};;;\n")
-        print(f"Amberg Geodate Export erfolgreich: {path}")
-    except Exception as e:
-        print(f"Fehler beim Amberg Geodate Export: {e}")
-
+# Die Funktion schreibe_amberg_csv wurde hier komplett entfernt, 
+# da wir sie jetzt aus berichte.py nutzen.
 
 def lade_rohdaten_aus_datei(dateiname):
     """
@@ -204,7 +187,14 @@ def run_simulation(dateiname):
             ap_pnrs = {str(p.get("PNR") or p.get("pnr")) for p in params.get("SOLL_KOORDINATEN", [])}
             amberg_csv_name = dateiname.replace("rohdaten", "amberg").replace(".txt", ".csv")
             amberg_path = os.path.join(ergebnis_ordner, f"sim_{amberg_csv_name}")
-            schreibe_amberg_csv(amberg_path, neupunkte, ap_pnrs)
+            
+            # NEU: Aufruf über das Modul berichte
+            berichte.schreibe_amberg_csv(amberg_path, neupunkte, ap_pnrs)
+            
+            # NEU: Text Bericht für die Simulation schreiben
+            txt_name = dateiname.replace("rohdaten", "ausgleichung").replace(".txt", "_ausgleichung.txt")
+            txt_path = os.path.join(ergebnis_ordner, f"sim_{txt_name}")
+            berichte.schreibe_ausgleichung_txt(txt_path, gma, neupunkte, params_raw)
             
             try:
                 subprocess.Popen([sys.executable, "upload.py", amberg_path])
