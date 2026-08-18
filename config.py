@@ -7,9 +7,44 @@ from tkinter import ttk, filedialog, messagebox, simpledialog
 
 APP_TITLE = "Monitoring-Konfigurator"
 
-# ==========================================
-# BERECHNUNGSTEIL
-# ==========================================
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tw = None
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+
+    def enter(self, event=None):
+        # Startkoordinaten direkt unter dem Widget
+        x = self.widget.winfo_rootx()
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 2
+        
+        self.tw = tk.Toplevel(self.widget)
+        self.tw.wm_overrideredirect(True) # Entfernt die Fenster-Rahmen
+        
+        label = tk.Label(self.tw, text=self.text, justify='left',
+                         background="#ffffe0", relief='solid', borderwidth=1,
+                         font=("tahoma", "9", "normal"), padx=5, pady=5)
+        label.pack(ipadx=1)
+        
+        # UI kurz aktualisieren, um die tatsächliche Breite des ToolTips abzufragen
+        self.tw.update_idletasks()
+        tip_width = self.tw.winfo_reqwidth()
+        screen_width = self.widget.winfo_screenwidth()
+        
+        # Wenn das ToolTip rechts aus dem Bildschirm ragt, schiebe es nach links
+        if x + tip_width > screen_width:
+            x = screen_width - tip_width - 10
+            
+        self.tw.wm_geometry(f"+{x}+{y}")
+
+    def leave(self, event=None):
+        if self.tw:
+            self.tw.destroy()
+            self.tw = None
+
+
 class PolarCalculator:
     @staticmethod
     def calculate_single(s_e, s_n, s_h, p_e, p_n, p_h):
@@ -25,9 +60,7 @@ class PolarCalculator:
             
         return hz_gon, vz_gon, dist_3d
 
-# ==========================================
-# DATENMODELL & I/O
-# ==========================================
+
 def empty_model():
     return {
         "pktliste": [],           
@@ -92,9 +125,7 @@ def save_params_to_file(path: str, data: dict):
         json.dump(save_data, f, ensure_ascii=False, indent=2)
 
 
-# ==========================================
-# DIALOGE
-# ==========================================
+
 class PointDialog(simpledialog.Dialog):
     def __init__(self, master, title, mode, init=None):
         self.mode = mode
@@ -177,9 +208,7 @@ class ParamDialog(simpledialog.Dialog):
         return True
 
 
-# ==========================================
-# HAUPT-GUI
-# ==========================================
+
 class ParamsApp:
     def __init__(self, root):
         self.root = root
@@ -203,7 +232,7 @@ class ParamsApp:
         main.columnconfigure(1, weight=1)
         main.rowconfigure(0, weight=1)
 
-        # Toolbar links
+        
         left = ttk.Frame(main)
         left.grid(row=0, column=0, sticky="ns", padx=(0, 12))
         ttk.Button(left, text="Datei öffnen", command=self.on_open).pack(fill="x", pady=2)
@@ -211,7 +240,7 @@ class ParamsApp:
         self.lbl_status = ttk.Label(left, text="Bereit.", wraplength=150)
         self.lbl_status.pack(anchor="w", pady=10)
 
-        # Tab-System
+       
         center = ttk.Frame(main)
         center.grid(row=0, column=1, sticky="nsew")
         self.nb = ttk.Notebook(center)
@@ -242,7 +271,7 @@ class ParamsApp:
         self.tree_param.heading("k", text="Schlüssel"); self.tree_param.heading("v", text="Wert")
         self.tree_param.pack(fill="both", expand=True)
 
-        # Frame Rechts (dynamisch)
+        
         self.frame_right = ttk.LabelFrame(main, text="Aktionen")
         self.frame_right.grid(row=0, column=2, sticky="ns", padx=(12, 0), ipadx=5, ipady=5)
 
@@ -253,6 +282,27 @@ class ParamsApp:
         tid = self.nb.index(self.nb.select())
         
         if tid == 0:  # Ziele
+            # Import Button
+            ttk.Button(self.frame_right, text="TXT Importieren", command=self.on_import_ziele).pack(fill="x", pady=(2, 0), padx=5)
+            
+            # Hinweistext + Info-Icon
+            frm_hint = ttk.Frame(self.frame_right)
+            frm_hint.pack(fill="x", pady=(0, 8), padx=5)
+            ttk.Label(frm_hint, text="Format: PNR HZ VZ Addkonst.", font=("Segoe UI", 8)).pack(side="left")
+            lbl_info = ttk.Label(frm_hint, text=" ⓘ", foreground="blue", cursor="question_arrow")
+            lbl_info.pack(side="left")
+            
+            # Der Text für das Hover-Menü
+            info_text = (
+                "Erwartete Syntax je Zeile:\n"
+                "[ID] [HZ] [VZ] [Prismenkonstante]\n\n"
+                "Beispiel:\n"
+                "1000 214.5432 99.1234 0.0175\n\n"
+                "• Getrennt durch Leerzeichen/Tabs\n"
+                "• Komma oder Punkt als Dezimaltrennzeichen"
+            )
+            ToolTip(lbl_info, info_text)
+            
             ttk.Button(self.frame_right, text="Hinzufügen", command=self.on_add).pack(fill="x", pady=2, padx=5)
             ttk.Button(self.frame_right, text="Bearbeiten", command=self.on_edit).pack(fill="x", pady=2, padx=5)
             ttk.Button(self.frame_right, text="Löschen", command=self.on_delete).pack(fill="x", pady=2, padx=5)
@@ -260,7 +310,27 @@ class ParamsApp:
             ttk.Button(self.frame_right, text="📥 Ziele exportieren", command=self.on_export_ziele).pack(fill="x", pady=2, padx=5)
             
         elif tid == 1:  # Koordinaten
-            ttk.Button(self.frame_right, text="TXT Importieren", command=self.on_import_coords).pack(fill="x", pady=2, padx=5)
+            # Import Button
+            ttk.Button(self.frame_right, text="TXT Importieren", command=self.on_import_coords).pack(fill="x", pady=(2, 0), padx=5)
+            
+            # Hinweistext + Info-Icon
+            frm_hint2 = ttk.Frame(self.frame_right)
+            frm_hint2.pack(fill="x", pady=(0, 8), padx=5)
+            ttk.Label(frm_hint2, text="Format: PNR X Y Z", font=("Segoe UI", 8)).pack(side="left")
+            lbl_info2 = ttk.Label(frm_hint2, text=" ⓘ", foreground="blue", cursor="question_arrow")
+            lbl_info2.pack(side="left")
+            
+            # Hover-Menü für Koordinaten
+            info_text_coords = (
+                "Erwartete Syntax je Zeile:\n"
+                "[ID] [X] [Y] [Z]\n\n"
+                "Beispiel:\n"
+                "100 3345123.45 5712345.67 104.50\n\n"
+                "• Getrennt durch Leerzeichen/Tabs\n"
+                "• Komma oder Punkt als Dezimaltrennzeichen"
+            )
+            ToolTip(lbl_info2, info_text_coords)
+            
             ttk.Button(self.frame_right, text="Manuell Hinzufügen", command=self.on_add).pack(fill="x", pady=2, padx=5)
             ttk.Button(self.frame_right, text="Bearbeiten", command=self.on_edit).pack(fill="x", pady=2, padx=5)
             ttk.Button(self.frame_right, text="Löschen", command=self.on_delete).pack(fill="x", pady=2, padx=5)
@@ -322,20 +392,61 @@ class ParamsApp:
     def on_import_coords(self):
         path = filedialog.askopenfilename(filetypes=[("Textdateien", "*.txt"), ("Alle", "*.*")])
         if not path: return
+        
+        count = 0
         try:
-            with open(path, 'r') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 for line in f:
                     parts = line.split()
                     if len(parts) >= 4:
-                        pnr, x, y, z = parts[0], float(parts[1]), float(parts[2]), float(parts[3])
+                        pnr = str(parts[0])
+                        # Kommas durch Punkte ersetzen
+                        x = float(parts[1].replace(",", "."))
+                        y = float(parts[2].replace(",", "."))
+                        z = float(parts[3].replace(",", "."))
+                        
                         ctype = self.coords_db.get(pnr, {}).get('type', 'Neupunkt') # default to Neupunkt
                         self.coords_db[pnr] = {'x': x, 'y': y, 'z': z, 'type': ctype}
+                        count += 1
+                        
             self._populate_all()
-            messagebox.showinfo("Erfolg", "Koordinaten importiert.")
+            messagebox.showinfo("Erfolg", f"{count} Koordinaten erfolgreich importiert.")
         except Exception as e:
-            messagebox.showerror("Fehler", f"Datei konnte nicht gelesen werden: {e}")
+            messagebox.showerror("Fehler", f"Datei konnte nicht gelesen werden:\n{e}")
 
-    # --- DATEN-MANIPULATION ---
+    def on_import_ziele(self):
+        path = filedialog.askopenfilename(filetypes=[("Textdateien", "*.txt"), ("Alle", "*.*")])
+        if not path: return
+        
+        count = 0
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    parts = line.split() # Trennt automatisch bei einem oder mehreren Leerzeichen
+                    if len(parts) >= 4:
+                        pnr = str(parts[0])
+                        # Ersetze mögliche Kommas durch Punkte für das Float-Parsing
+                        hz = float(parts[1].replace(",", "."))
+                        vz = float(parts[2].replace(",", "."))
+                        prism = float(parts[3].replace(",", "."))
+                        
+                        # Neues Ziel an die Liste anhängen (append = fügt hinzu, überschreibt nicht)
+                        self.data["pktliste"].append({
+                            "pnr": pnr, 
+                            "hz": hz, 
+                            "vz": vz, 
+                            "prism": prism
+                        })
+                        count += 1
+            
+            # Tabelle neu laden
+            self._populate_all()
+            messagebox.showinfo("Erfolg", f"Erfolgreich {count} Ziele importiert und hinzugefügt.")
+            
+        except Exception as e:
+            messagebox.showerror("Fehler", f"Datei konnte nicht fehlerfrei verarbeitet werden:\n{e}")
+
+    
     def on_add(self):
         tid = self.nb.index(self.nb.select())
         if tid == 0:
@@ -416,7 +527,7 @@ class ParamsApp:
                 self.coords_db[pnr]['type'] = role
         self._populate_all()
 
-    # --- BERECHNUNG ---
+    
     def on_calculate_polar(self):
         stn = None
         for pnr, d in self.coords_db.items():
@@ -459,7 +570,7 @@ class ParamsApp:
         self.nb.select(self.tab_pkt)
         messagebox.showinfo("Erfolg", f"Polarwerte für {count} Ziele berechnet und in die Ziel-Liste übertragen.")
 
-    # --- EXPORT ---
+   
     def on_export_ziele(self):
         path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Textdatei", "*.txt")])
         if not path: return
@@ -485,7 +596,7 @@ class ParamsApp:
                 f.write(f"{str(pnr)} {x:.3f} {y:.3f} {z:.3f}\n")
         messagebox.showinfo("Erfolg", "Koordinaten exportiert.")
 
-    # --- UI UPDATE ---
+   
     def _populate_all(self):
         for t in (self.tree_pkt, self.tree_coords, self.tree_param): t.delete(*t.get_children())
         
