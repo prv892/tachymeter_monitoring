@@ -20,110 +20,146 @@ class sortierer():
         try:
             dictlist.sort(key=lambda x: x["HZ"], reverse=not auf)
         except KeyError:
-            
             dictlist.sort(key=lambda x: x["hz"], reverse=not auf)
         return dictlist
 
 class execute():
-    def __init__(self, pktliste, anz_saetze, temp=20.0, druck=1000):
+    def __init__(self, pktliste, anz_saetze, temp=20.0, druck=1000, ts_port='/dev/ttyUSB1'):
         self.startzeit = datetime.now()
         self.anz_saetze = anz_saetze
         self.tar = pktliste
         self.temp = temp
         self.druck = druck
+        self.ts_port = ts_port
         
-        self.connect() #Port beachten! (siehe connect())
-        self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
-        time.sleep(40)
+        try:
+            # 1. Neue ausfallsichere Verbindungsroutine aufrufen
+            self._connect_with_retries()
+            
+            # 2. Regulärer Ablauf startet ab hier
+            self.set_prism_type(BAPPrismenType.BAP_PRISM_ROUND)
+            atmo_data = AtmosphericCorrectionData(0.2818, self.druck, self.temp, self.temp)
+            print(f"Sende Atmo-Daten: {self.temp}°C bei {self.druck}hPa")
+            self.totalstation.set_atm_correction(atmo_data)
+            
+            print("Setze Streckenmessmodus...")
+            self.changeEDMmode(0) 
+            self.alle_saetze = [] 
+
+            for s_idx in range(self.anz_saetze):
+                print(f"Satz {s_idx+1} startet...")
+
+                # --- Lage I ---
+                L1 = Satzmessung.Lage(1)    
+                self.tar = sortierer.output(self.tar, True)
+                
+                for i in range(len(self.tar)):
+                    punkt = self.tar[i]
+                    pnr = punkt.get("PNR", punkt.get("pnr"))
+                    hz = float(punkt.get("HZ", punkt.get("hz")))
+                    vz = float(punkt.get("VZ", punkt.get("vz")))
+                    p_const = float(punkt.get("PRISM", punkt.get("prism", 0.0)))
+                    print("Messung 1. Lage: Punkt "+str(pnr))
+                    self.moveit(hz, vz)
+                    
+                    m_obj = self.totalstation.measure(pnr, self.totalstation.get_atm_correction(), time.time())
+                    korr_dist = float(m_obj.slope_distances) + p_const
+                    
+                    x = Satzmessung.Messung(m_obj.target_number, float(m_obj.direction.value_rad),
+                                           float(m_obj.zenith.value_rad), korr_dist)
+                    L1.addMessung(x)
+                    
+                # --- Lage II ---
+                L2 = Satzmessung.Lage(2)
+                self.tar = sortierer.output(self.tar, False)
+                
+                for i in range(len(self.tar)):
+                    punkt = self.tar[i]
+                    pnr = punkt.get("PNR", punkt.get("pnr"))
+                    hz = float(punkt.get("HZ", punkt.get("hz")))
+                    vz = float(punkt.get("VZ", punkt.get("vz")))
+                    p_const = float(punkt.get("PRISM", punkt.get("prism", 0.0)))
+                
+                    print("Messung 2. Lage: Punkt "+str(pnr))
+                    self.moveit(hz + 200, 400 - vz)
+                    
+                    m_obj = self.totalstation.measure(pnr, self.totalstation.get_atm_correction(), time.time())
+                    korr_dist = float(m_obj.slope_distances) + p_const
+
+                    x = Satzmessung.Messung(
+                        m_obj.target_number, 
+                        float(m_obj.direction.value_rad),
+                        float(m_obj.zenith.value_rad), 
+                        korr_dist
+                    )
+                    L2.addMessung(x)
+
+                S = Satzmessung.Satz(L1, L2)
+                S.mittelLage() 
+                self.alle_saetze.append(S) 
+                
+            self.sm = Satzmessung.Satzmessung(self.alle_saetze) 
+            
+            print("Satzmessung beendet, Warteposition...")
+            self.moveit(0,200) 
+            print("Gute Nacht Tachymeter!")
+            
+        finally:
+            print("Cleanup: Garantiertes Schließen der Verbindungen...")
+            if hasattr(self, 'totalstation'):
+                try:
+                    self.totalstation.turn_off() 
+                except Exception as e:
+                    print(f"Warnung beim Abschalten: {e}")
+                
+                try:
+                    self.totalstation.serialPort.close() 
+                    print("Serieller Port erfolgreich freigegeben.")
+                except Exception as e:
+                    print(f"Warnung beim Port-Schließen: {e}")
+
+    def _connect_with_retries(self):
+        """Versucht bis zu 3-mal, eine stabile Verbindung aufzubauen."""
+        max_retries = 3
         
-        ###--- 
-
-        """
-        Die 1. Geschwindigkeitskorretion wird im Gerät nach Herstellerformel angebracht! 
-        """
-        self.set_prism_type(BAPPrismenType.BAP_PRISM_ROUND)
-        atmo_data = AtmosphericCorrectionData(0.2818, self.druck, self.temp, self.temp)
-        print(f"Sende Atmo-Daten: {self.temp}°C bei {self.druck}hPa")
-        self.totalstation.set_atm_correction(atmo_data)
-        
-        ###---
-
-        print("Setze Streckenmessmodus...")
-        self.changeEDMmode(0) ### Streckenmessmodus mit Reflektor, Reflektorlos = 1
-        self.alle_saetze = [] 
-
-        for s_idx in range(self.anz_saetze):
-            print(f"Satz {s_idx+1} startet...")
-
-            # --- Lage I ---
-            L1 = Satzmessung.Lage(1)    
-            self.tar = sortierer.output(self.tar, True)
-            
-            for i in range(len(self.tar)):
-                punkt = self.tar[i]
-                pnr = punkt.get("PNR", punkt.get("pnr"))
-                hz = float(punkt.get("HZ", punkt.get("hz")))
-                vz = float(punkt.get("VZ", punkt.get("vz")))
-                p_const = float(punkt.get("PRISM", punkt.get("prism", 0.0)))
-                print("Messung 1. Lage: Punkt "+str(pnr))
-                self.moveit(hz, vz)
+        for versuch in range(max_retries):
+            try:
+                print(f"Verbindungsversuch {versuch + 1}/3 auf {self.ts_port}...")
+                self.connect()
                 
-                m_obj = self.totalstation.measure(pnr, self.totalstation.get_atm_correction(), time.time())
-                korr_dist = float(m_obj.slope_distances) + p_const
+                print("Sende wake_up() Signal...")
+                self.totalstation.wake_up()
                 
-                x = Satzmessung.Messung(m_obj.target_number, float(m_obj.direction.value_rad),
-                                       float(m_obj.zenith.value_rad), korr_dist)
-                L1.addMessung(x)
+                print("Warte 5 Sekunden auf Instrument...")
+                time.sleep(5)
                 
+                # Testbefehl absenden, um Timeout abzufangen
+                print("Prüfe Kommunikationsebene...")
+                instr_name = self.totalstation.get_instrument_name()
+                print(f"Erfolgreich verbunden mit: {instr_name}")
                 
-            # --- Lage II ---
-            L2 = Satzmessung.Lage(2)
-            self.tar = sortierer.output(self.tar, False)
-            
-            for i in range(len(self.tar)):
-                punkt = self.tar[i]
-                pnr = punkt.get("PNR", punkt.get("pnr"))
-                hz = float(punkt.get("HZ", punkt.get("hz")))
-                vz = float(punkt.get("VZ", punkt.get("vz")))
-                p_const = float(punkt.get("PRISM", punkt.get("prism", 0.0)))
-            
-                print("Messung 2. Lage: Punkt "+str(pnr))
-                # Berechnung für die zweite Lage (Umschlag)
-                self.moveit(hz + 200, 400 - vz)
+                # Wenn wir bis hierher kommen, war alles erfolgreich -> Schleife abbrechen
+                return
                 
-                m_obj = self.totalstation.measure(pnr, self.totalstation.get_atm_correction(), time.time())
-                korr_dist = float(m_obj.slope_distances) + p_const
-
-                x = Satzmessung.Messung(
-                    m_obj.target_number, 
-                    float(m_obj.direction.value_rad),
-                    float(m_obj.zenith.value_rad), 
-                    korr_dist
-                    #achtung *0.5 evtl wieder weg!
-                )
-                L2.addMessung(x)
-
-            S = Satzmessung.Satz(L1, L2)
-            S.mittelLage() # Hier wird die 1-gon Toleranz intern angewendet, Schwellenwert ist bewusst hoch & sollte nicht geändert werden!
-            self.alle_saetze.append(S) 
-            
-        self.sm = Satzmessung.Satzmessung(self.alle_saetze) 
-        
-        print("Satzmessung beendet, Warteposition...")
-        self.moveit(0,200) #Parkposition
-        print("Gute Nacht Tachymeter!")
-        self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
-        self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
+            except Exception as e:
+                print(f"Verbindungsfehler bei Versuch {versuch + 1}: {e}")
+                
+                # Port sicherheitshalber schließen, um ihn für den nächsten Versuch freizugeben
+                if hasattr(self, 'totalstation'):
+                    try:
+                        self.totalstation.serialPort.close()
+                    except:
+                        pass
+                
+                if versuch < max_retries - 1:
+                    print("Warte 10 Sekunden vor dem nächsten Versuch...")
+                    time.sleep(10)
+                    
+        # Wenn die Schleife ohne 'return' durchläuft, schlug alles fehl
+        raise ConnectionError("Abbruch: Tachymeter reagiert auch nach 3 Versuchen nicht auf Befehle.")
 
     def connect(self):
-
-        """
-        Wichtig: ttyUSB0 ist standardmäßig der erste angeschlossene USB-Port: 
-        Entweder das Tachymeter IMMER als 1. anschließen, oder den Port entsprechend ändern
-        Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
-        """
-        self.totalstation = TotalStation("/dev/ttyUSB1", baudrate=115200) #für linux
-        #self.totalstation = TotalStation("COM11", baudrate=9600)     #für windows
+        self.totalstation = TotalStation(self.ts_port, baudrate=115200) 
 
     def moveit(self, ph, pv):
         self.totalstation.set_telescope_position(Angle.from_gon(ph%400), Angle.from_gon(pv%400), 
@@ -134,11 +170,6 @@ class execute():
         self.totalstation.set_edm_mode(mode)
 
     def set_prism_type(self, prism_type: BAPPrismenType):
-        """
-        Sendet den Befehl zum Wechsel des Prismentyps direkt über die 
-        offene Schnittstelle der pyGeoCOM-Bibliothek.
-        RPC 17008 = BAP_SetPrismType
-        """
         command = f"%R1Q,17008:{prism_type.value}"
         response = self.totalstation.request(command)
-        return response[0] # Gibt den LeicaReturnCode zurück    
+        return response[0]

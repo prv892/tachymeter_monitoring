@@ -13,6 +13,8 @@ import serial.tools.list_ports
 import pandas as pd
 import time
 from datetime import datetime
+import serial.tools.list_ports
+
 
 from pyGeoCOM.surveytools import Angle, Coordinate
 from pyGeoCOM.GeoComLite import TotalStation, AtmosphericCorrectionData 
@@ -28,12 +30,12 @@ class execute():
         self.druck = druck
         
         self.connect() #Port beachten! (siehe connect())
-        self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
-        time.sleep(30)
+        #self.totalstation.wake_up() #Tachymeter wird angeschaltet (weglassen bei BT-Verbindung)
+        #time.sleep(30)
         self.totalstation.get_instrument_name();
         
         self.moveit(100,100) #Parkposition
-        self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
+        #self.totalstation.turn_off() #Tachymeter wird abgeschaltet (unb. weglassen bei BT-Verbindung!)
         self.totalstation.serialPort.close() #evtl. unnötig, wird sicherheitshalber trotzdem gemacht
 
     def connect(self):
@@ -43,7 +45,18 @@ class execute():
         Entweder das Tachymeter IMMER als 1. anschließen, oder den Port entsprechend ändern
         Wird das Programm auf einem Windows-Betriebssystem ausgeführt, so ist der Pfad zum USB-Port zu ändern (/COMxx)
         """
-        self.totalstation = TotalStation("/dev/ttyUSB1", baudrate=115200)
+        for p in serial.tools.list_ports.comports():
+                # FTDI-Chip (0403:6001) -> Totalstation
+                if p.vid == 0x0403 and p.pid == 0x6001:
+                    port_ts = p.device
+                    print(f"Totalstation gefunden an: {port_ts}")
+                    
+                # Prolific-Chip (067B:23A3) -> Thermometer
+                elif p.vid == 0x067B and p.pid == 0x23A3:
+                    port_temp = p.device
+                    print(f"Thermometer gefunden an: {port_temp}")
+        self.totalstation = TotalStation(port_ts, baudrate=115200)
+        #self.totalstation = TotalStation("/dev/ttyUSB0", baudrate=115200)
 
     def moveit(self, ph, pv):
         self.totalstation.set_telescope_position(Angle.from_gon(ph%400), Angle.from_gon(pv%400), 

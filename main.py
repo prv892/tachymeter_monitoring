@@ -6,6 +6,7 @@ from aufnahme_neu import execute
 from ausgleichung import GaussMarkovAusgleichung
 from Satzmessung import Satzmessung
 import berichte
+import serial.tools.list_ports
 
 """
 Dieses Modul ist das "Main"-Modul des ganzen Programms.
@@ -19,6 +20,26 @@ PARAM_ORDNER = "parameter"
 PARAM_DATEI = os.path.join(PARAM_ORDNER, "params.txt")
 ORDNER_RAW = "rohdaten"
 ORDNER_RES = "ergebnisse"
+
+
+
+def finde_usb_ports():
+    # Fallback-Ports, falls mal etwas nicht erkannt wird
+    port_ts = '/dev/ttyUSB0' 
+    port_temp = '/dev/ttyUSB1' 
+    
+    for p in serial.tools.list_ports.comports():
+        # FTDI-Chip (0403:6001) -> Totalstation
+        if p.vid == 0x0403 and p.pid == 0x6001:
+            port_ts = p.device
+            print(f"Totalstation gefunden an: {port_ts}")
+            
+        # Prolific-Chip (067B:23A3) -> Thermometer
+        elif p.vid == 0x067B and p.pid == 0x23A3:
+            port_temp = p.device
+            print(f"Thermometer gefunden an: {port_temp}")
+            
+    return port_ts, port_temp
 
 def lade_parameter():
     if not os.path.exists(PARAM_DATEI):
@@ -93,9 +114,13 @@ def main():
     config = {k.upper(): v for k, v in config.items()}
 
     # --- Sensorwerte / Startwerte abrufen ---
+    port_ts, port_temp = finde_usb_ports()
+
     aktuelle_temp = float(config.get("START_TEMP", 20.0))
     aktueller_druck = float(config.get("START_DRUCK", 1013.25))
     anz_saetze = int(config.get("SAETZE", 1))
+
+
 
     p_manager = PressureManager()
     p_val, t_int = p_manager.get_data()
@@ -103,7 +128,7 @@ def main():
         aktueller_druck = p_val
         print(f"Sensor BMP388: {aktueller_druck:.1f} hPa")
 
-    t_manager = Thermometer('/dev/ttyUSB1')
+    t_manager = Thermometer(port_temp)
     try:
         t_manager.Open()
         aktuelle_temp = t_manager.Temperature()
@@ -116,7 +141,7 @@ def main():
         t_manager.Close()
 
     # Aufnahme starten
-    aufnahme = execute(params["PKTLISTE"], anz_saetze, temp=aktuelle_temp, druck=aktueller_druck)
+    aufnahme = execute(params["PKTLISTE"], anz_saetze, temp=aktuelle_temp, druck=aktueller_druck, ts_port=port_ts)
     
     # Berechnungen vorbereiten
     satzmessung = aufnahme.sm
